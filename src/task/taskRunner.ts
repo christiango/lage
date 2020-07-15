@@ -14,14 +14,23 @@ import {
   getChangedPackages,
   getTransitiveProviders,
 } from "workspace-tools";
-import { Priority } from "../types/Priority";
 
 /** Returns a map that maps task name to the priorities config for that task */
-function getPriorityMap(priorities: Priority[]) {
+function getPriorityMap(config: Config, workspace: Workspace) {
   const result = new Map<string, Task["priorities"]>();
 
-  priorities.forEach((entry) => {
+  config.priorities.forEach((entry) => {
     const taskPriority = result.get(entry.task) || {};
+
+    if (config.pipeline[entry.task] === undefined) {
+      throw new Error(`Priorities list references unknown task: ${entry.task}`);
+    }
+
+    if (workspace.allPackages[entry.package] === undefined) {
+      throw new Error(
+        `Priorities list references unknown package: ${entry.package}`
+      );
+    }
     taskPriority[entry.package] = entry.priority;
     result.set(entry.task, taskPriority);
   });
@@ -37,7 +46,7 @@ export async function runTasks(options: {
 }) {
   const { graph, workspace, context, config } = options;
 
-  const priorityMap = getPriorityMap(config.priorities);
+  const priorityMap = getPriorityMap(config, workspace);
 
   let pipeline = createPipeline(graph, {
     // dummy logger for task-scheduler because lage already has logger for its tasks
